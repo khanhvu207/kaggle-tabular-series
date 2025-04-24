@@ -1,6 +1,10 @@
 numpy
+fire
 pandas
 matplotlib
 seaborn
 scikit-learn
 jupyterlab
+xgboost
+catboost
+optuna
