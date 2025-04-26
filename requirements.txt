@@ -8,3 +8,4 @@ jupyterlab
 xgboost
 catboost
 optuna
+tqdm
