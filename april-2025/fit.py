@@ -40,121 +40,62 @@ def oof_target_encode(
     seed=42,
     ordinal=False,
     prefix="TE_",
+    batch_size=5,
 ):
-    """Leakage-free (OOF) target encoding, fast even with many features."""
+    """Leakage-free (OOF) target encoding, now with optional batching."""
     train_out = train_df.copy()
     test_out = test_df.copy()
 
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
-    for feature in tqdm(features, desc="Encoding features"):
-        te_col = f"{prefix}{feature}"
-        oof_encoded_feature = pd.Series(index=train_df.index, dtype=float)
+    def batch(iterable, size):
+        for i in range(0, len(iterable), size):
+            yield iterable[i:i + size]
 
-        # OOF encoding
+    feature_batches = list(batch(features, batch_size or len(features)))
+
+    for feature_batch in tqdm(feature_batches, desc="Encoding feature batches"):
+        te_cols = [f"{prefix}{feature}" for feature in feature_batch]
+        oof_encoded_batch = pd.DataFrame(index=train_df.index, columns=te_cols, dtype=float)
+
+        # OOF encoding per batch
         for tr_idx, val_idx in kf.split(train_df):
             tr_part, val_part = train_df.iloc[tr_idx], train_df.iloc[val_idx]
 
             enc = TargetEncoder(smooth=smooth, random_state=seed)
-            enc.fit(tr_part[[feature]], tr_part[target_col])
+            enc.fit(tr_part[feature_batch], tr_part[target_col])
 
-            val_encoded = pd.DataFrame(
-                enc.transform(val_part[[feature]]),
-                index=val_part.index,
-                columns=[feature],
-            )
+            val_encoded = enc.transform(val_part[feature_batch])
+            if not isinstance(val_encoded, pd.DataFrame):
+                val_encoded = pd.DataFrame(val_encoded, index=val_part.index, columns=feature_batch)
+
+            val_encoded.columns = te_cols
             val_encoded.index = val_part.index
 
-            oof_encoded_feature.iloc[val_idx] = val_encoded[feature].values
+            oof_encoded_batch.iloc[val_idx] = val_encoded.values
 
         if ordinal:
-            oof_encoded_feature = oof_encoded_feature.rank(method="dense").astype(int)
+            oof_encoded_batch = oof_encoded_batch.rank(method="dense").astype(int)
 
-        train_out[te_col] = oof_encoded_feature
+        train_out[te_cols] = oof_encoded_batch
 
-        # Now fit on full training set for test
+        # Full encoding on test set
         final_enc = TargetEncoder(smooth=smooth, random_state=seed)
-        final_enc.fit(train_df[[feature]], train_df[target_col])
-        test_encoded = pd.DataFrame(
-            final_enc.transform(test_df[[feature]]),
-            index=test_df.index,
-            columns=[feature],
-        )
+        final_enc.fit(train_df[feature_batch], train_df[target_col])
+
+        test_encoded = final_enc.transform(test_df[feature_batch])
+        if not isinstance(test_encoded, pd.DataFrame):
+            test_encoded = pd.DataFrame(test_encoded, index=test_df.index, columns=feature_batch)
+
+        test_encoded.columns = te_cols
         test_encoded.index = test_df.index
 
         if ordinal:
             test_encoded = test_encoded.rank(method="dense").astype(int)
 
-        test_out[te_col] = test_encoded[feature].astype(float)
+        test_out[te_cols] = test_encoded
 
     return train_out, test_out
-
-# def oof_target_encode(
-#     train_df,
-#     test_df,
-#     features,
-#     target_col,
-#     smooth=0.0,
-#     n_splits=5,
-#     seed=42,
-#     ordinal=False,
-#     prefix="TE_",
-#     batch_size=5,
-# ):
-#     """Leakage-free (OOF) target encoding, now with optional batching."""
-#     train_out = train_df.copy()
-#     test_out = test_df.copy()
-
-#     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
-
-#     def batch(iterable, size):
-#         for i in range(0, len(iterable), size):
-#             yield iterable[i:i + size]
-
-#     feature_batches = list(batch(features, batch_size or len(features)))
-
-#     for feature_batch in tqdm(feature_batches, desc="Encoding feature batches"):
-#         te_cols = [f"{prefix}{feature}" for feature in feature_batch]
-#         oof_encoded_batch = pd.DataFrame(index=train_df.index, columns=te_cols, dtype=float)
-
-#         # OOF encoding per batch
-#         for tr_idx, val_idx in kf.split(train_df):
-#             tr_part, val_part = train_df.iloc[tr_idx], train_df.iloc[val_idx]
-
-#             enc = TargetEncoder(smooth=smooth, random_state=seed)
-#             enc.fit(tr_part[feature_batch], tr_part[target_col])
-
-#             val_encoded = enc.transform(val_part[feature_batch])
-#             if not isinstance(val_encoded, pd.DataFrame):
-#                 val_encoded = pd.DataFrame(val_encoded, index=val_part.index, columns=feature_batch)
-
-#             val_encoded.columns = te_cols
-#             val_encoded.index = val_part.index
-
-#             oof_encoded_batch.iloc[val_idx] = val_encoded.values
-
-#         if ordinal:
-#             oof_encoded_batch = oof_encoded_batch.rank(method="dense").astype(int)
-
-#         train_out[te_cols] = oof_encoded_batch
-
-#         # Full encoding on test set
-#         final_enc = TargetEncoder(smooth=smooth, random_state=seed)
-#         final_enc.fit(train_df[feature_batch], train_df[target_col])
-
-#         test_encoded = final_enc.transform(test_df[feature_batch])
-#         if not isinstance(test_encoded, pd.DataFrame):
-#             test_encoded = pd.DataFrame(test_encoded, index=test_df.index, columns=feature_batch)
-
-#         test_encoded.columns = te_cols
-#         test_encoded.index = test_df.index
-
-#         if ordinal:
-#             test_encoded = test_encoded.rank(method="dense").astype(int)
-
-#         test_out[te_cols] = test_encoded
-
-#     return train_out, test_out
 
 
 def cast_columns(df: pd.DataFrame, columns: list, target_dtype: str) -> pd.DataFrame:
@@ -775,7 +716,7 @@ class Solver:
             target_col="Listening_Time_minutes",
             n_splits=5,
             seed=42,
-            smooth=0,
+            smooth="auto",
             ordinal=False,
             prefix="TE_",
         )
@@ -942,7 +883,7 @@ def main(verbose=True, seed=42, load=True):
             "subsample": 0.9,  # Row subsample per tree
             "learning_rate": 0.02,  # Conservative learning rate
             "n_estimators": 50_000,  # Sufficient depth for boosting
-            "max_depth": 20,  # Deep enough to capture interactions
+            "max_depth": 14,  # Deep enough to capture interactions
             "min_child_weight": 10,  # Regularizes splits for stability
             # "gamma": 0.1,  # Minimum loss reduction for splits
             "random_state": seed,  # Ensure reproducibility
