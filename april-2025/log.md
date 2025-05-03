@@ -10,4 +10,4 @@
 
 - Base: 12.6906
 - Added Linear prediction of Episode_Length_minutes: 12.5868 (-0.1038)
-- Added Rounded_LP_Episode_Length_minutes + Number_of_Ads:
+- Five additional combined categorical features: 12.5105 (-0.1801)
