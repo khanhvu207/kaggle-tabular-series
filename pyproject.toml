@@ -1,0 +1,32 @@
+[build-system]
+requires      = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "kaggle-tabular-kvu"
+version         = "1.0.0"
+description     = "Source code for Kaggle tabular competitions"
+readme          = "README.md"
+requires-python = ">=3.12"
+authors         = [{name="Nguyen-Khanh Vu", email="ngkhanhvu207@gmail.com"}]
+dependencies = [
+    "fire",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "scikit-learn",
+    "jupyterlab",
+    "xgboost",
+    "optuna",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "black",
+  "isort",
+]
+
+[tool.setuptools.packages.find]
+where = ["."] 
