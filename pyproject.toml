@@ -17,8 +17,12 @@ dependencies = [
     "scikit-learn",
     "jupyterlab",
     "xgboost",
+    "lightgbm",
+    "catboost",
     "optuna",
     "tqdm",
+    "pyarrow",
+    "polars",
 ]
 
 [project.optional-dependencies]

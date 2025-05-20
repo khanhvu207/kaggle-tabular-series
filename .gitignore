@@ -1,6 +1,9 @@
 **/data
 **/logs
 **/__pycache__
+**/AutogluonModels
+**/catboost_info
 venv/
+test.ipynb
 **/*.DS_Store
 *.egg-info
