@@ -93,9 +93,9 @@ class RegressionTargetEncoder(BaseEstimator, TransformerMixin):
         self._fitted = False
         
         # Enable string cache once for all instances
-        if not RegressionTargetEncoder._string_cache_enabled:
+        if not RegressionTargetEncoder._pl_string_cache_enabled:
             pl.enable_string_cache()
-            RegressionTargetEncoder._string_cache_enabled = True
+            RegressionTargetEncoder._pl_string_cache_enabled = True
 
     def _compute_stat_multi(self, X_df, y, stat="mean"):
         """
