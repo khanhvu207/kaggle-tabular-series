@@ -37,12 +37,12 @@ def encode_target_statistics(
     for stat in stats:
         encoder = RegressionTargetEncoder(statistic=stat, cv=5, random_state=seed)
 
-        X_train = train_df[target_encoding_features]
+        X_train = train_df[target_encoding_features].astype("string")
         y_train = train_df[target_col]
         train_encoded = encoder.fit_transform(X_train, y_train)
 
         target_encoded_list = [
-            encoder.transform(target_df[target_encoding_features])
+            encoder.transform(target_df[target_encoding_features].astype("string"))
             for target_df in target_dfs
         ]
 
@@ -118,7 +118,7 @@ class RegressionTargetEncoder(BaseEstimator, TransformerMixin):
             agg_expr = pl.col("y").quantile(0.75, "nearest").alias("stat")
         else:
             agg_expr = getattr(pl.col("y"), stat)().alias("stat")
-
+        
         res = (melted
                .group_by(["feature", "x"])
                .agg(pl.count().alias("count"), agg_expr))
@@ -133,15 +133,14 @@ class RegressionTargetEncoder(BaseEstimator, TransformerMixin):
             ).with_columns(pl.col("smoothed").alias("stat"))
 
         out = {}
-        for f, subdf in res.group_by("feature"):
+        for (f,), subdf in res.group_by("feature"):
             out[f] = dict(zip(subdf["x"].to_list(), subdf["stat"].to_list()))
         return out
 
     def fit(self, X, y):
-        X = pd.DataFrame(X)
+        X = pd.DataFrame(X).astype("string")
         y = pd.Series(y)
 
-        # global stat for unseen categories
         if self.statistic == "q25":
             self.global_stat_ = y.quantile(0.25)
         elif self.statistic == "q75":
@@ -159,7 +158,7 @@ class RegressionTargetEncoder(BaseEstimator, TransformerMixin):
         if not self._fitted:
             raise RuntimeError("You must fit the encoder first.")
 
-        X = pd.DataFrame(X)
+        X = pd.DataFrame(X).astype("string")
         default = (self.fill_value
                    if self.fill_value is not None else self.global_stat_)
 
@@ -180,7 +179,7 @@ class RegressionTargetEncoder(BaseEstimator, TransformerMixin):
             self.fit(X, y)
             return self.transform(X)
 
-        X = pd.DataFrame(X)
+        X = pd.DataFrame(X).astype("string")
         y = pd.Series(y)
         oof = np.zeros((len(y), X.shape[1]), dtype=float)
 
@@ -193,11 +192,9 @@ class RegressionTargetEncoder(BaseEstimator, TransformerMixin):
         else:
             self.global_stat_ = getattr(y, self.statistic)()
 
-        bins = pd.qcut(y, self.cv, labels=False, duplicates='drop')
-        kf = StratifiedKFold(n_splits=self.cv, shuffle=True,
-                             random_state=self.random_state)
+        kf = KFold(n_splits=self.cv, shuffle=True, random_state=self.random_state)
 
-        for train_idx, val_idx in kf.split(X, bins):
+        for train_idx, val_idx in kf.split(X):
             X_tr, y_tr = X.iloc[train_idx], y.iloc[train_idx]
             X_val = X.iloc[val_idx]
 
