@@ -46,14 +46,18 @@ def transform_features(
     cast_columns_inplace(train_df, ["id"], "int32")
     for target_df in target_dfs:
         cast_columns_inplace(target_df, ["id"], "int32")
-    
+
     categorical_features = ["Sex"]
     int_features = []
     float_features = ["Age", "Height", "Weight", "Duration", "Heart_Rate", "Body_Temp"]
-    
-    train_df["Sex_Encoded"] = train_df["Sex"].map({'female': -1, 'male': 1}).astype("int32")
+
+    train_df["Sex_Encoded"] = (
+        train_df["Sex"].map({"female": -1, "male": 1}).astype("int32")
+    )
     for target_df in target_dfs:
-        target_df["Sex_Encoded"] = target_df["Sex"].map({'female': -1, 'male': 1}).astype("int32")
+        target_df["Sex_Encoded"] = (
+            target_df["Sex"].map({"female": -1, "male": 1}).astype("int32")
+        )
     float_features.append("Sex_Encoded")
 
     def mifflin_st_jeor(row):
@@ -132,109 +136,26 @@ def transform_features(
         ]
     )
 
-    rounded_train = train_df[float_features].round().add_prefix("Rounded_").astype("int32")
+    rounded_train = (
+        train_df[float_features].round().add_prefix("Rounded_").astype("int32")
+    )
     train_df = train_df.assign(**rounded_train)
 
     rounded_float_features = rounded_train.columns.tolist()
 
     for i, target_df in enumerate(target_dfs):
-        rounded_target = target_df[float_features].round().add_prefix("Rounded_").astype("int32")
+        rounded_target = (
+            target_df[float_features].round().add_prefix("Rounded_").astype("int32")
+        )
         target_dfs[i] = target_df.assign(**rounded_target)
 
     profile(timer, "Added new features")
 
     combined_features = []
-    # combination_pool = [
-    #     "Sex",
-    #     "Age",
-    #     "Rounded_BMI",
-    #     "Rounded_Duration",
-    #     "Rounded_Heart_Rate",
-    #     "Rounded_Body_Temp",
-    # ]
-    # for k in [5, 4, 3, 2]:
-    #     train_df, new_col_names = add_k_tuple_columns(
-    #         train_df, k=k, cols=combination_pool, sep="_"
-    #     )
-    #     combined_features.extend(new_col_names)
-    #     for i, target_df in enumerate(target_dfs):
-    #         target_dfs[i], _ = add_k_tuple_columns(
-    #             target_df, k=k, cols=combination_pool, sep="_"
-    #         )
-
-    # cast_columns_inplace(train_df, combined_features, "category")
-    # for target_df in target_dfs:
-    #     cast_columns_inplace(target_df, combined_features, "category")
-
-    # cast_columns_inplace(train_df, [target_col], "float64")
-    # train_df, target_dfs, te_features = encode_target_statistics(
-    #     train_df=train_df,
-    #     target_dfs=target_dfs,
-    #     target_col=target_col,
-    #     target_encoding_features=combined_features,
-    #     stats=["min", "q25", "mean", "median", "q75", "max"],
-    #     seed=seed,
-    # )
-    # float_features.extend(te_features)
-    # profile(timer, "Target encoding")
-
     cast_columns_inplace(train_df, float_features, "float32")
     for target_df in target_dfs:
         cast_columns_inplace(target_df, float_features, "float32")
 
-    # mult_pool = [
-    #     "Age", 
-    #     "Sex_Encoded",
-    #     "BMI",
-    #     "Total_Exertion",
-    #     "Heart_Effort",
-    #     "BMR",
-    #     "LBM",
-    #     "BSA",
-    #     "Body_Fat_Pct",
-    #     "MHR",
-    #     "pct_MHR",
-    #     "Training_Load",
-    #     "VO2",
-    #     "Heat_Index",
-    # ]
-    # pows = [[1, 1], [1, -1], [-1, 1]]
-    # new_train_cols = {}
-    # new_target_cols_list = [{} for _ in target_dfs]
-    # for feature_group in combinations(mult_pool, 2):
-    #     col1, col2 = feature_group
-    #     col1_vals_train = train_df[col1]
-    #     col2_vals_train = train_df[col2]
-    #     col1_vals_targets = [target_df[col1] for target_df in target_dfs]
-    #     col2_vals_targets = [target_df[col2] for target_df in target_dfs]
-        
-    #     for p0, p1 in pows:
-    #         feature_name = f"Mult_{p0}_{p1}_{col1}_{col2}"
-    #         float_features.append(feature_name)
-    #         new_train_cols[feature_name] = np.power(col1_vals_train, p0) * np.power(col2_vals_train, p1)
-    #         for i in range(len(target_dfs)):
-    #             new_target_cols_list[i][feature_name] = (
-    #                 np.power(col1_vals_targets[i], p0) * np.power(col2_vals_targets[i], p1)
-    #             )
-
-    # train_df = pd.concat([train_df, pd.DataFrame(new_train_cols, index=train_df.index)], axis=1)
-    # for i, target_df in enumerate(target_dfs):
-    #     target_dfs[i] = pd.concat([target_df, pd.DataFrame(new_target_cols_list[i], index=target_df.index)], axis=1)
-    # profile(timer, "Added MULT feature combinations")
-    
-    # # Merge the L1 predictions to the features
-    # l1_oof_preds = pd.read_parquet("data/l1_oof_preds.parquet")
-    # l1_test_preds = pd.read_parquet("data/l1_test_preds.parquet")
-    # train_df = train_df.merge(l1_oof_preds, on="id", how="left")
-    
-    # for i in range(len(target_dfs)):
-    #     target_dfs[i] = target_dfs[i].merge(l1_test_preds, on="id", how="left")
-    
-    # preds_columns = l1_oof_preds.columns
-    # preds_columns = [col for col in preds_columns if col not in ["id"]]
-    # float_features.extend(preds_columns) 
-    # profile(timer, "Added L1 predictions")
-     
     train_df.drop(columns=combined_features + rounded_float_features, inplace=True)
     for target_df in target_dfs:
         target_df.drop(columns=combined_features, inplace=True)
@@ -243,7 +164,7 @@ def transform_features(
     train_df.drop(columns=["Sex"], inplace=True)
     for target_df in target_dfs:
         target_df.drop(columns=["Sex"], inplace=True)
-        
+
     cast_columns_inplace(train_df, categorical_features, "category")
     cast_columns_inplace(train_df, int_features, "int32")
     cast_columns_inplace(train_df, float_features, "float32")
@@ -258,22 +179,14 @@ def transform_features(
     for target_df in target_dfs:
         assert len(target_df.select_dtypes(include=["object"]).columns) == 0
 
-    # # Print out columns of 64 bits
-    # print("Columns of 64 bits:")
-    # for col in train_df.select_dtypes(include=["int64", "float64"]).columns:
-    #     print(f"{col}: {train_df[col].dtype}")
-
     detector = LocalOutlierFactor(
-        n_neighbors=50,
-        algorithm="auto",
-        contamination=0.01,
-        n_jobs=-1
+        n_neighbors=50, algorithm="auto", contamination=0.01, n_jobs=-1
     )
     outlier_labels = detector.fit_predict(train_df.drop(columns=["id"]))
     train_df["is_outlier"] = outlier_labels
     train_df["is_outlier"] = train_df["is_outlier"].astype("int32")
     profile(timer, "Outlier detection")
-    
+
     # y = np.log1p(train_df["Calories"])
     # train_df["bin"] = pd.qcut(y, q=10, labels=False, duplicates="drop")
     train_df["kfold"] = -1
@@ -417,8 +330,7 @@ class Solver:
                 oof_scores[metric_name].append(score)
 
                 print(
-                    f"Fold {fold_id + 1}/{self.n_folds}, "
-                    f"{metric_name}: {score:.6f}"
+                    f"Fold {fold_id + 1}/{self.n_folds}, " f"{metric_name}: {score:.6f}"
                 )
 
         # Create log directory
@@ -529,39 +441,16 @@ def main(verbose=True, seed=42, log_dir="l1_logs"):
             "loss_function": "RMSE",
             "eval_metric": "RMSE",
             "iterations": 50_000,
-            "learning_rate": 0.03,              # Default: 0.03
-            "depth": 6,                         # Default: 6
-            "l2_leaf_reg": 3.0,                 # Default: 3.0
-            "subsample": 1.0,                   # Default: 0.8 for MVS bootstrap
-            "rsm": 1.0,                         # Default: 1.0    
+            "learning_rate": 0.03,  # Default: 0.03
+            "depth": 6,  # Default: 6
+            "l2_leaf_reg": 3.0,  # Default: 3.0
+            "subsample": 1.0,  # Default: 0.8 for MVS bootstrap
+            "rsm": 1.0,  # Default: 1.0
             "random_seed": seed,
             "early_stopping_rounds": 500,
             "thread_count": 4,
         },
     }
-    # model_params = {
-    #     "name": "Ridge",
-    #     "params": {
-    #         "alpha": 1e-2,
-    #         "max_iter": 3000,
-    #         "random_state": seed,
-    #     },
-    # }
-    # model_params = {
-    #     "name": "MLPRegressor",
-    #     "params": {
-    #         "hidden_layer_sizes": (128, 64),
-    #         "activation": "relu",
-    #         "solver": "adam",
-    #         "learning_rate_init": 0.001,
-    #         "max_iter": 3000,
-    #         "tol": 1e-6,
-    #         "early_stopping": True,
-    #         "random_state": seed,
-    #         "verbose": True,
-    #     },
-    # }
-    
 
     scores = solver.train(
         model=globals()[model_params["name"]](**model_params["params"]),
