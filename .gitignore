@@ -3,7 +3,9 @@
 **/__pycache__
 **/AutogluonModels
 **/catboost_info
+**/*.DS_Store
+**/*logs
 venv/
 test.ipynb
-**/*.DS_Store
 *.egg-info
+*.pytest_cache
